@@ -1,0 +1,18 @@
+[package]
+name = "tun_sidecar-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tun_sidecar-common = { path = "../tun_sidecar-common" }
+
+aya-ebpf = { workspace = true }
+aya-log-ebpf = { workspace = true }
+network-types = "0.0.7"
+
+[build-dependencies]
+which = { workspace = true }
+
+[[bin]]
+name = "tun_sidecar"
+path = "src/main.rs"
