@@ -11,7 +11,7 @@ use aya_ebpf::{
     programs::TcContext,
     EbpfContext,
 };
-use aya_log_ebpf::info;
+use aya_log_ebpf::*;
 use network_types::{
     eth::{EthHdr, EtherType},
     ip::{IpProto, Ipv4Hdr},
@@ -47,7 +47,7 @@ pub fn tun_sidecar(ctx: TcContext) -> i32 {
     }
 }
 
-pub fn is_clash(ctx: &TcContext) -> bool {
+pub fn should_bypass(ctx: &TcContext) -> bool {
     let ptr = ctx.as_ptr() as *mut __sk_buff;
     let ptr = unsafe { &*ptr };
     let mark = ptr.mark;
@@ -59,7 +59,7 @@ pub fn is_clash(ctx: &TcContext) -> bool {
 }
 
 fn try_tun_sidecar(ctx: TcContext) -> Result<i32, i32> {
-    if is_clash(&ctx) {
+    if should_bypass(&ctx) {
         return Ok(TC_ACT_PIPE);
     }
 
@@ -94,24 +94,22 @@ fn try_tun_sidecar(ctx: TcContext) -> Result<i32, i32> {
         _ => return Err(TC_ACT_PIPE),
     };
 
-    if dst == 0x01010101 {
-        info!(
-            &ctx,
-            "{}, {:i}:{} => {:i}:{}", proto, src, sport, dst, dport
-        );
-        let tun_index = unsafe { PARAMS.get(&TUN_INDEX_KEY) };
-        match tun_index {
-            Some(&index) => unsafe {
-                return Ok(bpf_redirect(index, 0) as i32);
-            },
-            None => {
-                info!(&ctx, "tun_index not found");
-                return Err(TC_ACT_PIPE);
-            }
+    trace!(
+        &ctx,
+        "{}, {:i}:{} => {:i}:{}", proto, src, sport, dst, dport
+    );
+
+    let tun_index = unsafe { PARAMS.get(&TUN_INDEX_KEY) };
+    match tun_index {
+        Some(&index) => unsafe {
+            trace!(&ctx, "redirect to if: {}", index);
+            return Ok(bpf_redirect(index, 0) as i32);
+        },
+        None => {
+            info!(&ctx, "tun_index not found");
+            return Err(TC_ACT_PIPE);
         }
     }
-
-    Ok(TC_ACT_PIPE)
 }
 
 #[cfg(not(test))]
