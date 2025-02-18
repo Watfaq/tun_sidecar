@@ -26,6 +26,9 @@ static PARAMS: HashMap<u32, u32> = HashMap::with_max_entries(8, 0);
 #[map]
 static BYPASS_MARKS: HashMap<u32, u8> = HashMap::with_max_entries(128, 0);
 
+#[map]
+static BYPASS_PIDS: HashMap<u32, u8> = HashMap::with_max_entries(128, 0);
+
 #[inline(always)]
 fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, i32> {
     let start = ctx.data();
@@ -52,6 +55,13 @@ pub fn should_bypass(ctx: &TcContext) -> bool {
     let ptr = unsafe { &*ptr };
     let mark = ptr.mark;
     if unsafe { BYPASS_MARKS.get(&mark) }.is_some() {
+        debug!(ctx, "bypass mark: {}", mark);
+        return true;
+    }
+
+    let tgid = ctx.tgid();
+    if unsafe { BYPASS_PIDS.get(&tgid).is_some() } {
+        debug!(ctx, "bypass tgid: {}", tgid);
         return true;
     }
 
@@ -96,7 +106,13 @@ fn try_tun_sidecar(ctx: TcContext) -> Result<i32, i32> {
 
     trace!(
         &ctx,
-        "{}, {:i}:{} => {:i}:{}", proto, src, sport, dst, dport
+        "tgid: {}, {}, {:i}:{} => {:i}:{}",
+        ctx.tgid(),
+        proto,
+        src,
+        sport,
+        dst,
+        dport,
     );
 
     let tun_index = unsafe { PARAMS.get(&TUN_INDEX_KEY) };
