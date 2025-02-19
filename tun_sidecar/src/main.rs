@@ -17,11 +17,10 @@ struct Opt {
     #[clap(short, long)]
     tun_name: String,
     /// marks for bypassing the tc eBPF program
-    #[clap(short, long)]
-    magic_marks: Vec<u32>,
-
-    #[clap(short, long)]
-    pids: Vec<u32>,
+    #[clap(short = 'm', long)]
+    bypass_marks: Vec<u32>,
+    #[clap(short = 'p', long)]
+    bypass_pids: Vec<u32>,
 }
 
 #[tokio::main]
@@ -56,8 +55,8 @@ async fn main() -> anyhow::Result<()> {
     let Opt {
         ifaces,
         tun_name,
-        magic_marks,
-        pids,
+        bypass_marks: marks,
+        bypass_pids: pids,
     } = opt;
     // error adding clsact to the interface if it is already added is harmless
     // the full cleanup can be done with 'sudo tc qdisc del dev eth0 clsact'.
@@ -77,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let mut bypass_marks: HashMap<_, u32, u8> =
             HashMap::try_from(ebpf.map_mut("BYPASS_MARKS").unwrap())?;
-        for mark in magic_marks {
+        for mark in marks {
             bypass_marks.insert(mark, 0, 0)?;
         }
     }
